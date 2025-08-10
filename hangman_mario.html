@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Hangman</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root {
+      --gap: 12px;
+      --radius: 12px;
+      --shadow: 0 8px 24px rgba(0,0,0,.08);
+      --font: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: var(--font);
+      margin: 0;
+      padding: 24px;
+      background: #fafafa;
+      color: #111;
+      display: grid;
+      place-items: center;
+      min-height: 100svh;
+    }
+    .game {
+      width: min(980px, 100%);
+      background: #fff;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: clamp(16px, 3vw, 32px);
+    }
+    h1 { margin: 0 0 8px; font-weight: 800; letter-spacing: .3px; }
+    .top {
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      gap: clamp(12px, 2.5vw, 24px);
+      align-items: start;
+    }
+    @media (max-width: 820px) {
+      .top { grid-template-columns: 1fr; }
+    }
+    canvas {
+      width: 100%;
+      height: auto;
+      background: #f4f6f8;
+      border-radius: var(--radius);
+      display: block;
+    }
+    .panel {
+      display: grid;
+      gap: var(--gap);
+    }
+    #word {
+      font: 700 clamp(22px, 5vw, 34px) var(--mono);
+      letter-spacing: .2em;
+      padding: 8px 0;
+      border-bottom: 2px dashed #e5e7eb;
+      word-break: break-word;
+    }
+    .status {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--gap);
+      font-size: 14px;
+      color: #333;
+    }
+    .status p { margin: 0; }
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+    select, button {
+      font: 600 14px var(--font);
+      border: 1px solid #e5e7eb;
+      background: #fff;
+      border-radius: 10px;
+      padding: 8px 12px;
+      cursor: pointer;
+      transition: transform .05s ease, background .2s ease, border-color .2s ease;
+    }
+    button:hover { background: #f6f8fa; }
+    button:active { transform: translateY(1px); }
+    button[disabled] {
+      opacity: .45;
+      cursor: not-allowed;
+    }
+    .keyboard {
+      margin-top: 16px;
+      display: grid;
+      grid-template-columns: repeat(13, 1fr);
+      gap: 8px;
+    }
+    @media (max-width: 520px) {
+      .keyboard { grid-template-columns: repeat(10, 1fr); }
+    }
+    .key {
+      padding: 10px 0;
+      text-transform: uppercase;
+    }
+    dialog {
+      border: none;
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: var(--shadow);
+      max-width: 420px;
+      width: calc(100% - 32px);
+    }
+    dialog::backdrop {
+      background: rgba(0,0,0,.35);
+      backdrop-filter: blur(2px);
+    }
+    .pill {
+      display: inline-block;
+      font: 700 12px var(--mono);
+      background: #eef2ff;
+      color: #3730a3;
+      padding: 2px 8px;
+      border-radius: 999px;
+    }
+    .muted { color: #666; }
+  
+/* === Super Mario–inspired 2D theme (pure CSS, no assets) === */
+:root{
+  --sky:#8ed6ff;
+  --grass:#39b54a; --grass-hi:#5ad06b; --grass-shadow:#2a943a;
+  --dirt:#b86d29; --dirt2:#9f5920;
+  --brick-top:#d47d34; --brick-mid:#b76324; --brick-shadow:#7a3a14;
+  --pipe1:#34c759; --pipe2:#0ea64d; --pipe-dark:#066e31;
+  --coin:#ffd34d; --coin-hi:#ffe27a; --coin-edge:#b78300;
+  --ink:#1f2430; --muted:#3a4a5f;
+}
+
+body{
+  color: var(--ink);
+  background:
+    /* clouds (big puffs) */
+    radial-gradient(circle at 12% 20%, rgba(255,255,255,.95) 0 36px, transparent 37px),
+    radial-gradient(circle at 26% 26%, rgba(255,255,255,.95) 0 24px, transparent 25px),
+    radial-gradient(circle at 72% 22%, rgba(255,255,255,.95) 0 30px, transparent 31px),
+    radial-gradient(circle at 82% 28%, rgba(255,255,255,.95) 0 20px, transparent 21px),
+    /* tiny puffs */
+    radial-gradient(circle at 60% 14%, rgba(255,255,255,.9) 0 8px, transparent 9px),
+    radial-gradient(circle at 35% 18%, rgba(255,255,255,.9) 0 10px, transparent 11px),
+    linear-gradient(var(--sky), var(--sky));
+  background-attachment: fixed;
+}
+
+/* Ground strip stuck to the bottom */
+body::after{
+  content:""; position: fixed; left:0; right:0; bottom:0; height: 140px; pointer-events:none;
+  background:
+    /* grass top blades */
+    repeating-linear-gradient(0deg, var(--grass-hi) 0 6px, var(--grass) 6px 10px),
+    /* dirt bricks */
+    linear-gradient(var(--dirt), var(--dirt2));
+  box-shadow: inset 0 12px 0 var(--grass-shadow);
+}
+
+/* Make the card invisible to show the sky, keep spacing */
+.game{
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* Title looks like HUD with a coin badge */
+h1{ font-weight:900; letter-spacing:.5px }
+.pill{
+  background:
+    radial-gradient(circle at 30% 35%, rgba(255,255,255,.8) 0 18%, transparent 19%),
+    radial-gradient(circle at 70% 60%, rgba(255,255,255,.6) 0 10%, transparent 11%),
+    linear-gradient(#ffe27a, #ffc846);
+  color:#7a5200;
+  border:2px solid var(--coin-edge);
+  border-radius: 999px;
+  box-shadow: inset 0 2px 0 rgba(255,255,255,.6), inset 0 -3px 0 rgba(0,0,0,.25), 0 2px 0 rgba(0,0,0,.2);
+  animation: coinShimmer 2.2s linear infinite;
+}
+@keyframes coinShimmer{
+  0%{ filter: saturate(1); }
+  50%{ filter: saturate(1.15) brightness(1.03); }
+  100%{ filter: saturate(1); }
+}
+
+/* Canvas: sky + hills + ground + pipe frame */
+canvas{
+  image-rendering: pixelated; image-rendering: crisp-edges;
+  border-radius: 6px;
+  border: 10px solid var(--pipe2);
+  background:
+    /* ground tile section (bottom 38%) */
+    linear-gradient(to top, rgba(0,0,0,0) 0%, rgba(0,0,0,0) 62%, rgba(0,0,0,0.05) 62% 100%),
+    repeating-linear-gradient(0deg, #7e461e 0 4px, #6c3c19 4px 8px) bottom/100% 38% no-repeat,
+    repeating-linear-gradient(90deg, rgba(0,0,0,.14) 0 2px, transparent 2px 20px) bottom/100% 38% no-repeat,
+    /* hills */
+    radial-gradient(ellipse at 15% 82%, #49b24f 0 24%, transparent 25%),
+    radial-gradient(ellipse at 85% 82%, #2fa946 0 28%, transparent 29%),
+    radial-gradient(ellipse at 60% 85%, #66c96d 0 18%, transparent 19%),
+    /* clouds again to overlap inside */
+    radial-gradient(circle at 20% 18%, rgba(255,255,255,.95) 0 28px, transparent 29px),
+    radial-gradient(circle at 78% 16%, rgba(255,255,255,.95) 0 26px, transparent 27px),
+    linear-gradient(var(--sky), var(--sky));
+  box-shadow:
+    inset 0 8px 0 rgba(255,255,255,.25),
+    inset 0 -10px 0 rgba(0,0,0,.25),
+    0 8px 0 var(--pipe-dark);
+}
+
+/* Word display: scoreboard strip */
+#word{
+  background:
+    linear-gradient(#fff, #f2f2f2);
+  border:3px solid #cfd6e4;
+  border-radius:6px;
+  padding:12px 16px;
+  letter-spacing:.18em;
+  box-shadow: inset 0 2px 0 rgba(255,255,255,.9), inset 0 -3px 0 rgba(0,0,0,.06);
+}
+
+/* Status text in fun colors */
+.status{ color: var(--muted) }
+.status p strong{ color:#1b3b1e }
+
+/* Controls: style like blocks and pipes */
+select, button{
+  font-weight:800;
+  border-radius:6px;
+  border:3px solid #2b2b2b;
+  color:#1a1a1a;
+  text-shadow: 0 1px 0 rgba(255,255,255,.6);
+  box-shadow: 0 3px 0 rgba(0,0,0,.3);
+}
+
+/* New Game = green pipe button */
+#newGame{
+  background: linear-gradient(var(--pipe1), var(--pipe2));
+  border-color: var(--pipe-dark);
+  color:#062a13;
+  box-shadow: inset 0 2px 0 rgba(255,255,255,.35), inset 0 -3px 0 rgba(0,0,0,.25), 0 4px 0 var(--pipe-dark);
+}
+#newGame:active{ transform: translateY(2px); box-shadow: inset 0 2px 0 rgba(0,0,0,.3) }
+
+/* Hint = question block */
+#hintBtn{
+  background:
+    radial-gradient(circle at 10% 15%, rgba(255,255,255,.7) 0 10%, transparent 11%),
+    radial-gradient(circle at 90% 15%, rgba(255,255,255,.7) 0 10%, transparent 11%),
+    radial-gradient(circle at 10% 85%, rgba(0,0,0,.15) 0 10%, transparent 11%),
+    radial-gradient(circle at 90% 85%, rgba(0,0,0,.15) 0 10%, transparent 11%),
+    linear-gradient(#ffd55e, #f3b938);
+  border:3px solid #9e6e16;
+  box-shadow: inset 0 2px 0 rgba(255,255,255,.5), inset 0 -3px 0 rgba(0,0,0,.25), 0 3px 0 #7d5611;
+}
+#hintBtn:hover{ filter: brightness(1.05) }
+#hintBtn:active{ transform: translateY(2px) }
+
+/* On-screen keyboard = brick blocks */
+.keyboard{ gap: 10px }
+.key{
+  background:
+    linear-gradient(var(--brick-top), var(--brick-mid)),
+    linear-gradient(90deg, rgba(0,0,0,.18) 0 2px, transparent 2px 100%),
+    linear-gradient(0deg, rgba(0,0,0,.18) 0 2px, transparent 2px 100%);
+  border: 3px solid var(--brick-shadow);
+  border-radius: 4px;
+  text-transform: uppercase;
+  font-weight: 900;
+  box-shadow: inset 0 2px 0 rgba(255,255,255,.35), inset 0 -3px 0 rgba(0,0,0,.22), 0 3px 0 var(--brick-shadow);
+}
+.key:hover{ filter: brightness(1.05) }
+.key:active{ transform: translateY(2px) }
+.key:disabled{ opacity:.55; filter: grayscale(.2) }
+
+/* Modal = friendly box with green rim */
+dialog{
+  background: #fff;
+  color: var(--ink);
+  border: 4px solid var(--pipe2);
+  border-radius: 8px;
+  box-shadow: inset 0 2px 0 rgba(255,255,255,.7), inset 0 -3px 0 rgba(0,0,0,.1), 0 18px 40px rgba(0,0,0,.35);
+}
+dialog::backdrop{ background: rgba(74, 144, 226, .35) }
+
+</style>
+</head>
+<body>
+  <main class="game" aria-label="Hangman game">
+    <h1>Hangman <span class="pill" id="difficultyPill">Normal</span></h1>
+
+    <section class="top">
+      <canvas id="hangCanvas" width="300" height="320" aria-hidden="true"></canvas>
+
+      <div class="panel">
+        <div id="word" aria-label="Secret word" role="text" aria-live="polite"></div>
+
+        <div class="status" aria-live="polite">
+          <p>Wrong: <strong id="wrong">0</strong>/<span id="max">7</span></p>
+          <p>Guessed: <span id="guessed" class="muted">—</span></p>
+          <p id="message" class="muted">Type a letter or tap a key.</p>
+        </div>
+
+        <div class="controls">
+          <label for="difficulty">Difficulty</label>
+          <select id="difficulty" aria-label="Difficulty">
+            <option value="easy">Easy</option>
+            <option value="normal" selected>Normal</option>
+            <option value="hard">Hard</option>
+          </select>
+          <button id="newGame" title="Start a new game">New game</button>
+          <button id="hintBtn" title="Reveal a random letter (costs 1 mistake)">Hint</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="keyboard" class="keyboard" aria-label="On-screen keyboard"></section>
+
+    <dialog id="modal" aria-labelledby="modalTitle">
+      <h2 id="modalTitle"></h2>
+      <p id="modalText"></p>
+      <button id="playAgain">Play again</button>
+    </dialog>
+  </main>
+
+  <script>
+    // Basic English word list. Replace or extend as you like.
+    const WORDS = [
+      "FIGMA","PIXEL","NEBULA","PYTHON","JAVASCRIPT","REACT","CANVAS","MATRIX",
+      "ALGORITHM","COMPILER","ASYNC","PROMISE","REQUEST","COOKIE","SESSION","DESIGN",
+      "MENTOR","KITTEN","HARUKA","GEORGIA","TBILISI","PLUGINS","VARIABLE","FUNCTION",
+      "OBJECT","ARRAY","MODULE","BROWSER","NETWORK","GRAPHIC","TYPOGRAPHY","KERNEL",
+      "MAGENTO","CHECKOUT","ITERATION","WIREFRAME","USABILITY","ACCESSIBLE","INCLUSIVE",
+      "PALETTE","ORANGE","COOKIES","COCOA","TEAPOT","WINTER","OUTDOOR","SKETCHBOOK",
+      "CALLIGRAPHY","ANDROID","IOS","TOOLBAR","DASHBOARD","WORKFLOW","SANDBOX","PROMPT"
+    ];
+
+    const state = {
+      word: "",
+      revealed: [],
+      guessed: new Set(),
+      wrong: 0,
+      maxWrong: 7,
+      difficulty: "normal",
+      hintUsed: false
+    };
+
+    const els = {
+      canvas: document.getElementById("hangCanvas"),
+      word: document.getElementById("word"),
+      wrong: document.getElementById("wrong"),
+      max: document.getElementById("max"),
+      guessed: document.getElementById("guessed"),
+      message: document.getElementById("message"),
+      keyboard: document.getElementById("keyboard"),
+      newGame: document.getElementById("newGame"),
+      hint: document.getElementById("hintBtn"),
+      difficulty: document.getElementById("difficulty"),
+      modal: document.getElementById("modal"),
+      modalTitle: document.getElementById("modalTitle"),
+      modalText: document.getElementById("modalText"),
+      playAgain: document.getElementById("playAgain"),
+      diffPill: document.getElementById("difficultyPill")
+    };
+
+    const ctx = els.canvas.getContext("2d");
+
+    function chooseWord(diff) {
+      // Simple length-based filtering to make difficulty feel different.
+      let pool;
+      if (diff === "easy") pool = WORDS.filter(w => w.length <= 6);
+      else if (diff === "hard") pool = WORDS.filter(w => w.length >= 8);
+      else pool = WORDS.filter(w => w.length >= 5 && w.length <= 9);
+
+      if (pool.length === 0) pool = WORDS;
+      const pick = pool[Math.floor(Math.random() * pool.length)];
+      return pick.toUpperCase();
+    }
+
+    function resetCanvas() {
+      ctx.clearRect(0, 0, els.canvas.width, els.canvas.height);
+      // Gallows
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = "#222";
+      ctx.lineCap = "round";
+      // base
+      line(30, 300, 270, 300);
+      // pole
+      line(70, 300, 70, 40);
+      // beam
+      line(70, 40, 200, 40);
+      // rope
+      line(200, 40, 200, 80);
+    }
+
+    function line(x1,y1,x2,y2) {
+      ctx.beginPath();
+      ctx.moveTo(x1,y1);
+      ctx.lineTo(x2,y2);
+      ctx.stroke();
+    }
+
+    // Parts order for drawing
+    function drawParts(n) {
+      // n is number of wrong guesses to render (capped)
+      if (n >= 1) { // head
+        ctx.beginPath();
+        ctx.arc(200, 105, 25, 0, Math.PI*2);
+        ctx.stroke();
+      }
+      if (n >= 2) { // body
+        line(200, 130, 200, 200);
+      }
+      if (n >= 3) { // left arm
+        line(200, 150, 168, 178);
+      }
+      if (n >= 4) { // right arm
+        line(200, 150, 232, 178);
+      }
+      if (n >= 5) { // left leg
+        line(200, 200, 178, 245);
+      }
+      if (n >= 6) { // right leg
+        line(200, 200, 222, 245);
+      }
+      if (n >= 7) { // face X for losing flourish
+        line(191, 98, 197, 104);
+        line(197, 98, 191, 104);
+        line(203, 98, 209, 104);
+        line(209, 98, 203, 104);
+      }
+    }
+
+    function setDifficulty(diff) {
+      state.difficulty = diff;
+      els.diffPill.textContent = diff[0].toUpperCase() + diff.slice(1);
+      // Mistake budget
+      state.maxWrong = diff === "easy" ? 10 : diff === "hard" ? 5 : 7;
+      els.max.textContent = String(state.maxWrong);
+    }
+
+    function startNewGame() {
+      setDifficulty(els.difficulty.value);
+      state.word = chooseWord(state.difficulty);
+      state.revealed = Array.from(state.word, ch => (ch === "-" ? true : ch === " " ? true : false));
+      state.guessed.clear();
+      state.wrong = 0;
+      state.hintUsed = false;
+      els.hint.disabled = false;
+      resetCanvas();
+      drawParts(0);
+      renderWord();
+      renderStatus();
+      buildKeyboard();
+      els.message.textContent = "Type a letter or tap a key.";
+      closeModal();
+    }
+
+    function renderWord() {
+      const display = [...state.word].map((ch, i) => {
+        if (ch === " " || ch === "-") return ch;
+        return state.revealed[i] ? ch : "▁";
+      }).join(" ");
+      els.word.textContent = display;
+    }
+
+    function renderStatus() {
+      els.wrong.textContent = String(state.wrong);
+      const guessedArr = [...state.guessed].sort();
+      els.guessed.textContent = guessedArr.length ? guessedArr.join(" ") : "—";
+      // Update key disabled state
+      [...els.keyboard.querySelectorAll("button.key")].forEach(btn => {
+        btn.disabled = state.guessed.has(btn.dataset.letter);
+      });
+      // Re-draw hangman parts
+      resetCanvas();
+      drawParts(Math.min(state.wrong, 7));
+    }
+
+    function buildKeyboard() {
+      const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+      els.keyboard.innerHTML = "";
+      letters.forEach(letter => {
+        const b = document.createElement("button");
+        b.className = "key";
+        b.type = "button";
+        b.textContent = letter;
+        b.dataset.letter = letter;
+        b.setAttribute("aria-label", `Guess ${letter}`);
+        b.addEventListener("click", () => guess(letter));
+        els.keyboard.appendChild(b);
+      });
+    }
+
+    function guess(raw) {
+      const letter = raw.toUpperCase();
+      if (!/^[A-Z]$/.test(letter)) return;
+
+      if (state.guessed.has(letter)) {
+        els.message.textContent = "Already tried that.";
+        return;
+      }
+      state.guessed.add(letter);
+
+      if (state.word.includes(letter)) {
+        // reveal all occurrences
+        [...state.word].forEach((ch, i) => {
+          if (ch === letter) state.revealed[i] = true;
+        });
+        els.message.textContent = "Good pick.";
+      } else {
+        state.wrong += 1;
+        els.message.textContent = "Nope.";
+      }
+
+      renderWord();
+      renderStatus();
+      checkEnd();
+    }
+
+    function checkEnd() {
+      const won = state.revealed.every(v => v === true);
+      const lost = state.wrong >= state.maxWrong;
+
+      if (won) {
+        openModal("You win 🎉", `Word: ${state.word}`);
+        disableAllKeys();
+        els.hint.disabled = true;
+      } else if (lost) {
+        // Draw final flourish
+        resetCanvas();
+        drawParts(7);
+        openModal("You lose 💀", `Word was: ${state.word}`);
+        disableAllKeys();
+        els.hint.disabled = true;
+      }
+    }
+
+    function disableAllKeys() {
+      [...els.keyboard.querySelectorAll("button.key")].forEach(b => b.disabled = true);
+    }
+
+    function useHint() {
+      if (state.hintUsed) return;
+      // Find unrevealed letters in the word
+      const options = [];
+      [...state.word].forEach((ch, i) => {
+        if (/[A-Z]/.test(ch) && !state.revealed[i]) options.push(ch);
+      });
+      if (!options.length) return;
+      const reveal = options[Math.floor(Math.random() * options.length)];
+      state.hintUsed = true;
+      els.hint.disabled = true;
+      // Hints cost 1 mistake to keep it fair
+      state.wrong = Math.min(state.wrong + 1, state.maxWrong);
+      // Auto-guess the revealed letter so UI stays consistent
+      if (!state.guessed.has(reveal)) state.guessed.add(reveal);
+      [...state.word].forEach((ch, i) => {
+        if (ch === reveal) state.revealed[i] = true;
+      });
+      els.message.textContent = `Hint used: ${reveal}`;
+      renderWord();
+      renderStatus();
+      checkEnd();
+    }
+
+    function openModal(title, text) {
+      els.modalTitle.textContent = title;
+      els.modalText.textContent = text;
+      if (!els.modal.open) els.modal.showModal();
+    }
+
+    function closeModal() {
+      if (els.modal.open) els.modal.close();
+    }
+
+    // Events
+    els.newGame.addEventListener("click", startNewGame);
+    els.hint.addEventListener("click", useHint);
+    els.difficulty.addEventListener("change", () => startNewGame());
+    els.playAgain.addEventListener("click", () => {
+      closeModal();
+      startNewGame();
+    });
+
+    // Physical keyboard input
+    window.addEventListener("keydown", (e) => {
+      // If modal is open, Enter restarts
+      if (els.modal.open && (e.key === "Enter" || e.key === " ")) {
+        e.preventDefault();
+        els.playAgain.click();
+        return;
+      }
+      const k = e.key.toUpperCase();
+      if (/^[A-Z]$/.test(k)) {
+        e.preventDefault();
+        guess(k);
+      }
+    });
+
+    // Init
+    startNewGame();
+  </script>
+</body>
+</html>
