@@ -316,6 +316,21 @@ dialog::backdrop{ background: rgba(74, 144, 226, .35) }
     </section>
 
     <section id="keyboard" class="keyboard" aria-label="On-screen keyboard"></section>
+    <!-- Nickname modal -->
+<dialog id="nameModal" aria-labelledby="nameTitle">
+  <h2 id="nameTitle">Choose your name</h2>
+  <div style="display:flex;gap:12px;align-items:center;margin:8px 0 14px">
+    <img id="nameAvatar" alt="" width="40" height="40" style="image-rendering:pixelated;border:3px solid #2b2b2b;border-radius:6px">
+    <input id="nameInput" type="text" maxlength="16" placeholder="Your name" style="flex:1;padding:8px 10px">
+  </div>
+  <button id="saveName">Let’s go</button>
+</dialog>
+
+<!-- Leaderboard panel -->
+<section id="board" class="panel" aria-label="Leaderboard" style="margin-top:18px">
+  <h3 style="margin:0 0 6px">Leaderboard</h3>
+  <ol id="top10" style="margin:0; padding-left:20px"></ol>
+</section>
 
     <dialog id="modal" aria-labelledby="modalTitle">
       <h2 id="modalTitle"></h2>
