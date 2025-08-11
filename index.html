@@ -2,310 +2,150 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Hangman</title>
+  <title>Hangman — Mario-ish + Leaderboard</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="Tiny Hangman with Mario-ish skin, usernames, avatars, and a Supabase leaderboard.">
+  <meta name="theme-color" content="#0ea64d">
   <style>
-    :root {
-      --gap: 12px;
-      --radius: 12px;
-      --shadow: 0 8px 24px rgba(0,0,0,.08);
-      --font: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial;
+    :root{
+      --sky:#8ed6ff;
+      --grass:#39b54a; --grass-hi:#5ad06b; --grass-shadow:#2a943a;
+      --dirt:#b86d29; --dirt2:#9f5920;
+      --brick-top:#d47d34; --brick-mid:#b76324; --brick-shadow:#7a3a14;
+      --pipe1:#34c759; --pipe2:#0ea64d; --pipe-dark:#066e31;
+      --ink:#1f2430; --muted:#3a4a5f;
+      --gap:12px; --radius:12px;
+      --font: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
       --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
     }
-    * { box-sizing: border-box; }
-    body {
-      font-family: var(--font);
-      margin: 0;
-      padding: 24px;
-      background: #fafafa;
-      color: #111;
-      display: grid;
-      place-items: center;
-      min-height: 100svh;
+    *{box-sizing:border-box}
+    body{
+      margin:0; font-family:var(--font); color:var(--ink);
+      background:
+        radial-gradient(circle at 12% 20%, rgba(255,255,255,.95) 0 36px, transparent 37px),
+        radial-gradient(circle at 26% 26%, rgba(255,255,255,.95) 0 24px, transparent 25px),
+        radial-gradient(circle at 72% 22%, rgba(255,255,255,.95) 0 30px, transparent 31px),
+        radial-gradient(circle at 82% 28%, rgba(255,255,255,.95) 0 20px, transparent 21px),
+        radial-gradient(circle at 60% 14%, rgba(255,255,255,.9) 0 8px, transparent 9px),
+        radial-gradient(circle at 35% 18%, rgba(255,255,255,.9) 0 10px, transparent 11px),
+        linear-gradient(var(--sky), var(--sky));
+      background-attachment:fixed;
+      padding:24px;
     }
-    .game {
-      width: min(980px, 100%);
-      background: #fff;
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      padding: clamp(16px, 3vw, 32px);
+    /* ground strip */
+    body::after{
+      content:""; position:fixed; left:0; right:0; bottom:0; height:140px; pointer-events:none;
+      background:
+        repeating-linear-gradient(0deg, var(--grass-hi) 0 6px, var(--grass) 6px 10px),
+        linear-gradient(var(--dirt), var(--dirt2));
+      box-shadow: inset 0 12px 0 var(--grass-shadow);
     }
-    h1 { margin: 0 0 8px; font-weight: 800; letter-spacing: .3px; }
-    .top {
-      display: grid;
-      grid-template-columns: 340px 1fr;
-      gap: clamp(12px, 2.5vw, 24px);
-      align-items: start;
+    main{max-width:980px; margin:0 auto}
+    h1{margin:0 0 8px; font-weight:900; letter-spacing:.5px}
+    .pill{
+      display:inline-block; margin-left:.5rem; font:700 12px var(--mono);
+      background: radial-gradient(circle at 30% 35%, rgba(255,255,255,.8) 0 18%, transparent 19%),
+                  radial-gradient(circle at 70% 60%, rgba(255,255,255,.6) 0 10%, transparent 11%),
+                  linear-gradient(#ffe27a, #ffc846);
+      color:#7a5200; border:2px solid #b78300; border-radius:999px; padding:2px 8px;
+      box-shadow: inset 0 2px 0 rgba(255,255,255,.6), inset 0 -3px 0 rgba(0,0,0,.25), 0 2px 0 rgba(0,0,0,.2);
+      animation: coinShimmer 2.2s linear infinite;
     }
-    @media (max-width: 820px) {
-      .top { grid-template-columns: 1fr; }
-    }
-    canvas {
-      width: 100%;
-      height: auto;
-      background: #f4f6f8;
-      border-radius: var(--radius);
-      display: block;
-    }
-    .panel {
-      display: grid;
-      gap: var(--gap);
-    }
-    #word {
-      font: 700 clamp(22px, 5vw, 34px) var(--mono);
-      letter-spacing: .2em;
-      padding: 8px 0;
-      border-bottom: 2px dashed #e5e7eb;
-      word-break: break-word;
-    }
-    .status {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: var(--gap);
-      font-size: 14px;
-      color: #333;
-    }
-    .status p { margin: 0; }
-    .controls {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      align-items: center;
-    }
-    select, button {
-      font: 600 14px var(--font);
-      border: 1px solid #e5e7eb;
-      background: #fff;
-      border-radius: 10px;
-      padding: 8px 12px;
-      cursor: pointer;
-      transition: transform .05s ease, background .2s ease, border-color .2s ease;
-    }
-    button:hover { background: #f6f8fa; }
-    button:active { transform: translateY(1px); }
-    button[disabled] {
-      opacity: .45;
-      cursor: not-allowed;
-    }
-    .keyboard {
-      margin-top: 16px;
-      display: grid;
-      grid-template-columns: repeat(13, 1fr);
-      gap: 8px;
-    }
-    @media (max-width: 520px) {
-      .keyboard { grid-template-columns: repeat(10, 1fr); }
-    }
-    .key {
-      padding: 10px 0;
-      text-transform: uppercase;
-    }
-    dialog {
-      border: none;
-      border-radius: 16px;
-      padding: 24px;
-      box-shadow: var(--shadow);
-      max-width: 420px;
-      width: calc(100% - 32px);
-    }
-    dialog::backdrop {
-      background: rgba(0,0,0,.35);
-      backdrop-filter: blur(2px);
-    }
-    .pill {
-      display: inline-block;
-      font: 700 12px var(--mono);
-      background: #eef2ff;
-      color: #3730a3;
-      padding: 2px 8px;
-      border-radius: 999px;
-    }
-    .muted { color: #666; }
+    @keyframes coinShimmer{ 0%{filter:saturate(1)} 50%{filter:saturate(1.15) brightness(1.03)} 100%{filter:saturate(1)} }
 
-    /* Leaderboard style to match Mario-ish UI */
-#board {
-  background: #fff;
-  border: 4px solid #0ea64d;
-  border-radius: 8px;
-  box-shadow: inset 0 2px 0 rgba(255,255,255,.7), inset 0 -3px 0 rgba(0,0,0,.08), 0 12px 30px rgba(0,0,0,.25);
-  padding: 12px 14px;
-}
-#board h3 { font-weight:900; }
-#top10 li {
-  display:flex; align-items:center; gap:8px; padding:6px 4px;
-  background:
-    linear-gradient(#d47d34, #b76324) 8px 50% / 8px 60% no-repeat,
-    linear-gradient(#fff,#f6f6f6);
-  border: 2px solid #7a3a14; border-radius:6px; margin:6px 0;
-}
-#top10 img.avatar { image-rendering:pixelated; width:24px; height:24px; border:2px solid #2b2b2b; border-radius:4px; }
-  
-/* === Super Mario–inspired 2D theme (pure CSS, no assets) === */
-:root{
-  --sky:#8ed6ff;
-  --grass:#39b54a; --grass-hi:#5ad06b; --grass-shadow:#2a943a;
-  --dirt:#b86d29; --dirt2:#9f5920;
-  --brick-top:#d47d34; --brick-mid:#b76324; --brick-shadow:#7a3a14;
-  --pipe1:#34c759; --pipe2:#0ea64d; --pipe-dark:#066e31;
-  --coin:#ffd34d; --coin-hi:#ffe27a; --coin-edge:#b78300;
-  --ink:#1f2430; --muted:#3a4a5f;
-}
+    .top{
+      display:grid; grid-template-columns:340px 1fr; gap:clamp(12px,2.5vw,24px); align-items:start;
+    }
+    @media (max-width:820px){ .top{ grid-template-columns:1fr } }
 
-body{
-  color: var(--ink);
-  background:
-    /* clouds (big puffs) */
-    radial-gradient(circle at 12% 20%, rgba(255,255,255,.95) 0 36px, transparent 37px),
-    radial-gradient(circle at 26% 26%, rgba(255,255,255,.95) 0 24px, transparent 25px),
-    radial-gradient(circle at 72% 22%, rgba(255,255,255,.95) 0 30px, transparent 31px),
-    radial-gradient(circle at 82% 28%, rgba(255,255,255,.95) 0 20px, transparent 21px),
-    /* tiny puffs */
-    radial-gradient(circle at 60% 14%, rgba(255,255,255,.9) 0 8px, transparent 9px),
-    radial-gradient(circle at 35% 18%, rgba(255,255,255,.9) 0 10px, transparent 11px),
-    linear-gradient(var(--sky), var(--sky));
-  background-attachment: fixed;
-}
+    canvas{
+      width:100%; height:auto; image-rendering:pixelated; image-rendering:crisp-edges;
+      border-radius:6px; border:10px solid var(--pipe2);
+      background:
+        linear-gradient(to top, rgba(0,0,0,0) 0%, rgba(0,0,0,0) 62%, rgba(0,0,0,0.05) 62% 100%),
+        repeating-linear-gradient(0deg, #7e461e 0 4px, #6c3c19 4px 8px) bottom/100% 38% no-repeat,
+        repeating-linear-gradient(90deg, rgba(0,0,0,.14) 0 2px, transparent 2px 20px) bottom/100% 38% no-repeat,
+        radial-gradient(ellipse at 15% 82%, #49b24f 0 24%, transparent 25%),
+        radial-gradient(ellipse at 85% 82%, #2fa946 0 28%, transparent 29%),
+        radial-gradient(ellipse at 60% 85%, #66c96d 0 18%, transparent 19%),
+        radial-gradient(circle at 20% 18%, rgba(255,255,255,.95) 0 28px, transparent 29px),
+        radial-gradient(circle at 78% 16%, rgba(255,255,255,.95) 0 26px, transparent 27px),
+        linear-gradient(var(--sky), var(--sky));
+      box-shadow: inset 0 8px 0 rgba(255,255,255,.25), inset 0 -10px 0 rgba(0,0,0,.25), 0 8px 0 var(--pipe-dark);
+    }
 
-/* Ground strip stuck to the bottom */
-body::after{
-  content:""; position: fixed; left:0; right:0; bottom:0; height: 140px; pointer-events:none;
-  background:
-    /* grass top blades */
-    repeating-linear-gradient(0deg, var(--grass-hi) 0 6px, var(--grass) 6px 10px),
-    /* dirt bricks */
-    linear-gradient(var(--dirt), var(--dirt2));
-  box-shadow: inset 0 12px 0 var(--grass-shadow);
-}
+    .panel{ display:grid; gap:var(--gap) }
+    #word{
+      background:linear-gradient(#fff,#f2f2f2); border:3px solid #cfd6e4; border-radius:6px;
+      padding:12px 16px; letter-spacing:.18em; font:700 clamp(22px,5vw,34px) var(--mono);
+      box-shadow: inset 0 2px 0 rgba(255,255,255,.9), inset 0 -3px 0 rgba(0,0,0,.06);
+    }
+    .status{ color:var(--muted); display:grid; grid-template-columns:repeat(3,1fr); gap:var(--gap); font-size:14px }
+    .controls{ display:flex; flex-wrap:wrap; gap:8px; align-items:center }
+    select, button{
+      font:800 14px var(--font); border-radius:6px; border:3px solid #2b2b2b; color:#1a1a1a;
+      text-shadow: 0 1px 0 rgba(255,255,255,.6); box-shadow:0 3px 0 rgba(0,0,0,.3);
+      background:#fff; cursor:pointer
+    }
+    #newGame{
+      background: linear-gradient(var(--pipe1), var(--pipe2)); border-color: var(--pipe-dark); color:#062a13;
+      box-shadow: inset 0 2px 0 rgba(255,255,255,.35), inset 0 -3px 0 rgba(0,0,0,.25), 0 4px 0 var(--pipe-dark);
+    }
+    #hintBtn{
+      background:
+        radial-gradient(circle at 10% 15%, rgba(255,255,255,.7) 0 10%, transparent 11%),
+        radial-gradient(circle at 90% 15%, rgba(255,255,255,.7) 0 10%, transparent 11%),
+        radial-gradient(circle at 10% 85%, rgba(0,0,0,.15) 0 10%, transparent 11%),
+        radial-gradient(circle at 90% 85%, rgba(0,0,0,.15) 0 10%, transparent 11%),
+        linear-gradient(#ffd55e, #f3b938);
+      border:3px solid #9e6e16; box-shadow: inset 0 2px 0 rgba(255,255,255,.5), inset 0 -3px 0 rgba(0,0,0,.25), 0 3px 0 #7d5611;
+    }
 
-/* Make the card invisible to show the sky, keep spacing */
-.game{
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
-}
+    .keyboard{ margin-top:16px; display:grid; grid-template-columns:repeat(13,1fr); gap:10px }
+    @media (max-width:520px){ .keyboard{ grid-template-columns: repeat(10,1fr) } }
+    .key{
+      text-transform:uppercase; font:900 14px var(--mono);
+      background:
+        linear-gradient(var(--brick-top), var(--brick-mid)),
+        linear-gradient(90deg, rgba(0,0,0,.18) 0 2px, transparent 2px 100%),
+        linear-gradient(0deg, rgba(0,0,0,.18) 0 2px, transparent 2px 100%);
+      border:3px solid var(--brick-shadow); border-radius:4px;
+      box-shadow: inset 0 2px 0 rgba(255,255,255,.35), inset 0 -3px 0 rgba(0,0,0,.22), 0 3px 0 var(--brick-shadow);
+      padding:10px 0;
+    }
+    .key:disabled{ opacity:.55; filter: grayscale(.2) }
 
-/* Title looks like HUD with a coin badge */
-h1{ font-weight:900; letter-spacing:.5px }
-.pill{
-  background:
-    radial-gradient(circle at 30% 35%, rgba(255,255,255,.8) 0 18%, transparent 19%),
-    radial-gradient(circle at 70% 60%, rgba(255,255,255,.6) 0 10%, transparent 11%),
-    linear-gradient(#ffe27a, #ffc846);
-  color:#7a5200;
-  border:2px solid var(--coin-edge);
-  border-radius: 999px;
-  box-shadow: inset 0 2px 0 rgba(255,255,255,.6), inset 0 -3px 0 rgba(0,0,0,.25), 0 2px 0 rgba(0,0,0,.2);
-  animation: coinShimmer 2.2s linear infinite;
-}
-@keyframes coinShimmer{
-  0%{ filter: saturate(1); }
-  50%{ filter: saturate(1.15) brightness(1.03); }
-  100%{ filter: saturate(1); }
-}
+    /* Win/Lose modal */
+    dialog{
+      background:#fff; color:var(--ink); border:4px solid var(--pipe2); border-radius:8px;
+      box-shadow: inset 0 2px 0 rgba(255,255,255,.7), inset 0 -3px 0 rgba(0,0,0,.1), 0 18px 40px rgba(0,0,0,.35);
+    }
+    dialog::backdrop{ background: rgba(74, 144, 226, .35) }
 
-/* Canvas: sky + hills + ground + pipe frame */
-canvas{
-  image-rendering: pixelated; image-rendering: crisp-edges;
-  border-radius: 6px;
-  border: 10px solid var(--pipe2);
-  background:
-    /* ground tile section (bottom 38%) */
-    linear-gradient(to top, rgba(0,0,0,0) 0%, rgba(0,0,0,0) 62%, rgba(0,0,0,0.05) 62% 100%),
-    repeating-linear-gradient(0deg, #7e461e 0 4px, #6c3c19 4px 8px) bottom/100% 38% no-repeat,
-    repeating-linear-gradient(90deg, rgba(0,0,0,.14) 0 2px, transparent 2px 20px) bottom/100% 38% no-repeat,
-    /* hills */
-    radial-gradient(ellipse at 15% 82%, #49b24f 0 24%, transparent 25%),
-    radial-gradient(ellipse at 85% 82%, #2fa946 0 28%, transparent 29%),
-    radial-gradient(ellipse at 60% 85%, #66c96d 0 18%, transparent 19%),
-    /* clouds again to overlap inside */
-    radial-gradient(circle at 20% 18%, rgba(255,255,255,.95) 0 28px, transparent 29px),
-    radial-gradient(circle at 78% 16%, rgba(255,255,255,.95) 0 26px, transparent 27px),
-    linear-gradient(var(--sky), var(--sky));
-  box-shadow:
-    inset 0 8px 0 rgba(255,255,255,.25),
-    inset 0 -10px 0 rgba(0,0,0,.25),
-    0 8px 0 var(--pipe-dark);
-}
+    /* Leaderboard block */
+    #board{
+      margin-top:18px; background:#fff; border:4px solid var(--pipe2); border-radius:8px;
+      box-shadow: inset 0 2px 0 rgba(255,255,255,.7), inset 0 -3px 0 rgba(0,0,0,.08), 0 12px 30px rgba(0,0,0,.25);
+      padding:12px 14px;
+    }
+    #board h3{ margin:0 0 6px; font-weight:900 }
+    #top10 li{
+      display:flex; align-items:center; gap:8px; padding:6px 4px; margin:6px 0;
+      background: linear-gradient(#fff,#f6f6f6);
+      border:2px solid #cfd6e4; border-radius:6px;
+    }
+    #top10 img.avatar{ image-rendering:pixelated; width:24px; height:24px; border:2px solid #2b2b2b; border-radius:4px }
 
-/* Word display: scoreboard strip */
-#word{
-  background:
-    linear-gradient(#fff, #f2f2f2);
-  border:3px solid #cfd6e4;
-  border-radius:6px;
-  padding:12px 16px;
-  letter-spacing:.18em;
-  box-shadow: inset 0 2px 0 rgba(255,255,255,.9), inset 0 -3px 0 rgba(0,0,0,.06);
-}
-
-/* Status text in fun colors */
-.status{ color: var(--muted) }
-.status p strong{ color:#1b3b1e }
-
-/* Controls: style like blocks and pipes */
-select, button{
-  font-weight:800;
-  border-radius:6px;
-  border:3px solid #2b2b2b;
-  color:#1a1a1a;
-  text-shadow: 0 1px 0 rgba(255,255,255,.6);
-  box-shadow: 0 3px 0 rgba(0,0,0,.3);
-}
-
-/* New Game = green pipe button */
-#newGame{
-  background: linear-gradient(var(--pipe1), var(--pipe2));
-  border-color: var(--pipe-dark);
-  color:#062a13;
-  box-shadow: inset 0 2px 0 rgba(255,255,255,.35), inset 0 -3px 0 rgba(0,0,0,.25), 0 4px 0 var(--pipe-dark);
-}
-#newGame:active{ transform: translateY(2px); box-shadow: inset 0 2px 0 rgba(0,0,0,.3) }
-
-/* Hint = question block */
-#hintBtn{
-  background:
-    radial-gradient(circle at 10% 15%, rgba(255,255,255,.7) 0 10%, transparent 11%),
-    radial-gradient(circle at 90% 15%, rgba(255,255,255,.7) 0 10%, transparent 11%),
-    radial-gradient(circle at 10% 85%, rgba(0,0,0,.15) 0 10%, transparent 11%),
-    radial-gradient(circle at 90% 85%, rgba(0,0,0,.15) 0 10%, transparent 11%),
-    linear-gradient(#ffd55e, #f3b938);
-  border:3px solid #9e6e16;
-  box-shadow: inset 0 2px 0 rgba(255,255,255,.5), inset 0 -3px 0 rgba(0,0,0,.25), 0 3px 0 #7d5611;
-}
-#hintBtn:hover{ filter: brightness(1.05) }
-#hintBtn:active{ transform: translateY(2px) }
-
-/* On-screen keyboard = brick blocks */
-.keyboard{ gap: 10px }
-.key{
-  background:
-    linear-gradient(var(--brick-top), var(--brick-mid)),
-    linear-gradient(90deg, rgba(0,0,0,.18) 0 2px, transparent 2px 100%),
-    linear-gradient(0deg, rgba(0,0,0,.18) 0 2px, transparent 2px 100%);
-  border: 3px solid var(--brick-shadow);
-  border-radius: 4px;
-  text-transform: uppercase;
-  font-weight: 900;
-  box-shadow: inset 0 2px 0 rgba(255,255,255,.35), inset 0 -3px 0 rgba(0,0,0,.22), 0 3px 0 var(--brick-shadow);
-}
-.key:hover{ filter: brightness(1.05) }
-.key:active{ transform: translateY(2px) }
-.key:disabled{ opacity:.55; filter: grayscale(.2) }
-
-/* Modal = friendly box with green rim */
-dialog{
-  background: #fff;
-  color: var(--ink);
-  border: 4px solid var(--pipe2);
-  border-radius: 8px;
-  box-shadow: inset 0 2px 0 rgba(255,255,255,.7), inset 0 -3px 0 rgba(0,0,0,.1), 0 18px 40px rgba(0,0,0,.35);
-}
-dialog::backdrop{ background: rgba(74, 144, 226, .35) }
-
-</style>
+    /* Name modal bits */
+    #nameModal input{ border:2px solid #7a3a14; border-radius:6px }
+    #nameModal button{
+      background: linear-gradient(#34c759, #0ea64d); border:3px solid #066e31; border-radius:6px;
+      color:#fff; font-weight:bold; padding:6px 14px;
+    }
+  </style>
 </head>
 <body>
-  <main class="game" aria-label="Hangman game">
+  <main>
     <h1>Hangman <span class="pill" id="difficultyPill">Normal</span></h1>
 
     <section class="top">
@@ -333,23 +173,23 @@ dialog::backdrop{ background: rgba(74, 144, 226, .35) }
       </div>
     </section>
 
-    <section id="keyboard" class="keyboard" aria-label="On-screen keyboard"></section>
-    <!-- Nickname modal -->
-<dialog id="nameModal" aria-labelledby="nameTitle">
-  <h2 id="nameTitle">Choose your name</h2>
-  <div style="display:flex;gap:12px;align-items:center;margin:8px 0 14px">
-    <img id="nameAvatar" alt="" width="40" height="40" style="image-rendering:pixelated;border:3px solid #2b2b2b;border-radius:6px">
-    <input id="nameInput" type="text" maxlength="16" placeholder="Your name" style="flex:1;padding:8px 10px">
-  </div>
-  <button id="saveName">Let’s go</button>
-</dialog>
+    <!-- Leaderboard -->
+    <section id="board" class="panel" aria-label="Leaderboard">
+      <h3>Leaderboard</h3>
+      <ol id="top10" style="margin:0; padding-left:20px"></ol>
+    </section>
 
-<!-- Leaderboard panel -->
-<section id="board" class="panel" aria-label="Leaderboard" style="margin-top:18px">
-  <h3 style="margin:0 0 6px">Leaderboard</h3>
-  <ol id="top10" style="margin:0; padding-left:20px"></ol>
-</section>
+    <!-- Name modal -->
+    <dialog id="nameModal" aria-labelledby="nameTitle">
+      <h2 id="nameTitle">Choose your name</h2>
+      <div style="display:flex;gap:12px;align-items:center;margin:8px 0 14px">
+        <img id="nameAvatar" alt="" width="40" height="40" style="image-rendering:pixelated;border:3px solid #2b2b2b;border-radius:6px">
+        <input id="nameInput" type="text" maxlength="16" placeholder="Your name" style="flex:1;padding:8px 10px">
+      </div>
+      <button id="saveName">Let’s go</button>
+    </dialog>
 
+    <!-- Win/Lose modal -->
     <dialog id="modal" aria-labelledby="modalTitle">
       <h2 id="modalTitle"></h2>
       <p id="modalText"></p>
@@ -357,8 +197,8 @@ dialog::backdrop{ background: rgba(74, 144, 226, .35) }
     </dialog>
   </main>
 
+  <!-- Game logic -->
   <script>
-    // Basic English word list. Replace or extend as you like.
     const WORDS = [
       "FIGMA","PIXEL","NEBULA","PYTHON","JAVASCRIPT","REACT","CANVAS","MATRIX",
       "ALGORITHM","COMPILER","ASYNC","PROMISE","REQUEST","COOKIE","SESSION","DESIGN",
@@ -368,409 +208,268 @@ dialog::backdrop{ background: rgba(74, 144, 226, .35) }
       "PALETTE","ORANGE","COOKIES","COCOA","TEAPOT","WINTER","OUTDOOR","SKETCHBOOK",
       "CALLIGRAPHY","ANDROID","IOS","TOOLBAR","DASHBOARD","WORKFLOW","SANDBOX","PROMPT"
     ];
-
     const state = {
-      word: "",
-      revealed: [],
-      guessed: new Set(),
-      wrong: 0,
-      maxWrong: 7,
-      difficulty: "normal",
-      hintUsed: false
+      word:"", revealed:[], guessed:new Set(), wrong:0, maxWrong:7,
+      difficulty:"normal", hintUsed:false
     };
-
     const els = {
-      canvas: document.getElementById("hangCanvas"),
-      word: document.getElementById("word"),
-      wrong: document.getElementById("wrong"),
-      max: document.getElementById("max"),
-      guessed: document.getElementById("guessed"),
-      message: document.getElementById("message"),
-      keyboard: document.getElementById("keyboard"),
-      newGame: document.getElementById("newGame"),
-      hint: document.getElementById("hintBtn"),
-      difficulty: document.getElementById("difficulty"),
-      modal: document.getElementById("modal"),
-      modalTitle: document.getElementById("modalTitle"),
-      modalText: document.getElementById("modalText"),
-      playAgain: document.getElementById("playAgain"),
-      diffPill: document.getElementById("difficultyPill")
+      canvas:document.getElementById("hangCanvas"),
+      word:document.getElementById("word"),
+      wrong:document.getElementById("wrong"),
+      max:document.getElementById("max"),
+      guessed:document.getElementById("guessed"),
+      message:document.getElementById("message"),
+      keyboard:document.getElementById("keyboard"),
+      newGame:document.getElementById("newGame"),
+      hint:document.getElementById("hintBtn"),
+      difficulty:document.getElementById("difficulty"),
+      modal:document.getElementById("modal"),
+      modalTitle:document.getElementById("modalTitle"),
+      modalText:document.getElementById("modalText"),
+      playAgain:document.getElementById("playAgain"),
+      diffPill:document.getElementById("difficultyPill"),
+      nameDlg:document.getElementById("nameModal"),
+      nameInput:document.getElementById("nameInput"),
+      nameAvatar:document.getElementById("nameAvatar"),
+      board:document.getElementById("top10")
     };
-
     const ctx = els.canvas.getContext("2d");
 
-    function chooseWord(diff) {
-      // Simple length-based filtering to make difficulty feel different.
+    function chooseWord(diff){
       let pool;
-      if (diff === "easy") pool = WORDS.filter(w => w.length <= 6);
-      else if (diff === "hard") pool = WORDS.filter(w => w.length >= 8);
-      else pool = WORDS.filter(w => w.length >= 5 && w.length <= 9);
-
-      if (pool.length === 0) pool = WORDS;
-      const pick = pool[Math.floor(Math.random() * pool.length)];
-      return pick.toUpperCase();
+      if (diff==="easy") pool = WORDS.filter(w=>w.length<=6);
+      else if (diff==="hard") pool = WORDS.filter(w=>w.length>=8);
+      else pool = WORDS.filter(w=>w.length>=5 && w.length<=9);
+      if (!pool.length) pool = WORDS;
+      return pool[Math.floor(Math.random()*pool.length)].toUpperCase();
     }
-
-    function resetCanvas() {
-      ctx.clearRect(0, 0, els.canvas.width, els.canvas.height);
-      // Gallows
-      ctx.lineWidth = 4;
-      ctx.strokeStyle = "#222";
-      ctx.lineCap = "round";
-      // base
-      line(30, 300, 270, 300);
-      // pole
-      line(70, 300, 70, 40);
-      // beam
-      line(70, 40, 200, 40);
-      // rope
-      line(200, 40, 200, 80);
+    function line(x1,y1,x2,y2){ ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke(); }
+    function resetCanvas(){
+      ctx.clearRect(0,0,els.canvas.width,els.canvas.height);
+      ctx.lineWidth=4; ctx.strokeStyle="#222"; ctx.lineCap="round";
+      line(30,300,270,300); line(70,300,70,40); line(70,40,200,40); line(200,40,200,80);
     }
-
-    function line(x1,y1,x2,y2) {
-      ctx.beginPath();
-      ctx.moveTo(x1,y1);
-      ctx.lineTo(x2,y2);
-      ctx.stroke();
+    function drawParts(n){
+      if (n>=1){ ctx.beginPath(); ctx.arc(200,105,25,0,Math.PI*2); ctx.stroke(); }
+      if (n>=2){ line(200,130,200,200); }
+      if (n>=3){ line(200,150,168,178); }
+      if (n>=4){ line(200,150,232,178); }
+      if (n>=5){ line(200,200,178,245); }
+      if (n>=6){ line(200,200,222,245); }
+      if (n>=7){ line(191,98,197,104); line(197,98,191,104); line(203,98,209,104); line(209,98,203,104); }
     }
-
-    // Parts order for drawing
-    function drawParts(n) {
-      // n is number of wrong guesses to render (capped)
-      if (n >= 1) { // head
-        ctx.beginPath();
-        ctx.arc(200, 105, 25, 0, Math.PI*2);
-        ctx.stroke();
-      }
-      if (n >= 2) { // body
-        line(200, 130, 200, 200);
-      }
-      if (n >= 3) { // left arm
-        line(200, 150, 168, 178);
-      }
-      if (n >= 4) { // right arm
-        line(200, 150, 232, 178);
-      }
-      if (n >= 5) { // left leg
-        line(200, 200, 178, 245);
-      }
-      if (n >= 6) { // right leg
-        line(200, 200, 222, 245);
-      }
-      if (n >= 7) { // face X for losing flourish
-        line(191, 98, 197, 104);
-        line(197, 98, 191, 104);
-        line(203, 98, 209, 104);
-        line(209, 98, 203, 104);
-      }
-    }
-
-    function setDifficulty(diff) {
-      state.difficulty = diff;
-      els.diffPill.textContent = diff[0].toUpperCase() + diff.slice(1);
-      // Mistake budget
-      state.maxWrong = diff === "easy" ? 10 : diff === "hard" ? 5 : 7;
+    function setDifficulty(diff){
+      state.difficulty=diff;
+      els.diffPill.textContent = diff[0].toUpperCase()+diff.slice(1);
+      state.maxWrong = diff==="easy" ? 10 : diff==="hard" ? 5 : 7;
       els.max.textContent = String(state.maxWrong);
     }
-
-    function startNewGame() {
+    function startNewGame(){
       setDifficulty(els.difficulty.value);
       state.word = chooseWord(state.difficulty);
-      state.revealed = Array.from(state.word, ch => (ch === "-" ? true : ch === " " ? true : false));
-      state.guessed.clear();
-      state.wrong = 0;
-      state.hintUsed = false;
-      els.hint.disabled = false;
-      resetCanvas();
-      drawParts(0);
-      renderWord();
-      renderStatus();
-      buildKeyboard();
-      els.message.textContent = "Type a letter or tap a key.";
+      state.revealed = Array.from(state.word, ch => (ch==="-"||ch===" ")?true:false);
+      state.guessed.clear(); state.wrong=0; state.hintUsed=false; els.hint.disabled=false;
+      resetCanvas(); drawParts(0); renderWord(); renderStatus();
+      els.message.textContent="Type a letter or tap a key.";
       closeModal();
     }
-
-    function renderWord() {
-      const display = [...state.word].map((ch, i) => {
-        if (ch === " " || ch === "-") return ch;
-        return state.revealed[i] ? ch : "▁";
-      }).join(" ");
-      els.word.textContent = display;
+    function renderWord(){
+      const display=[...state.word].map((ch,i)=> (ch===" "||ch==="-"?ch:(state.revealed[i]?ch:"▁"))).join(" ");
+      els.word.textContent=display;
     }
-
-    function renderStatus() {
-      els.wrong.textContent = String(state.wrong);
-      const guessedArr = [...state.guessed].sort();
-      els.guessed.textContent = guessedArr.length ? guessedArr.join(" ") : "—";
-      // Update key disabled state
-      [...els.keyboard.querySelectorAll("button.key")].forEach(btn => {
-        btn.disabled = state.guessed.has(btn.dataset.letter);
+    function renderStatus(){
+      els.wrong.textContent=String(state.wrong);
+      const g=[...state.guessed].sort(); els.guessed.textContent=g.length?g.join(" "):"—";
+      resetCanvas(); drawParts(Math.min(state.wrong,7));
+    }
+    function buildKeyboard(){
+      const wrap=document.createElement("section"); wrap.id="keyboard"; wrap.className="keyboard";
+      const letters="ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+      letters.forEach(letter=>{
+        const b=document.createElement("button");
+        b.className="key"; b.type="button"; b.textContent=letter; b.dataset.letter=letter;
+        b.setAttribute("aria-label",`Guess ${letter}`);
+        b.addEventListener("click",()=>guess(letter));
+        wrap.appendChild(b);
       });
-      // Re-draw hangman parts
-      resetCanvas();
-      drawParts(Math.min(state.wrong, 7));
+      // insert after main controls
+      document.querySelector(".controls").after(wrap);
     }
-
-    function buildKeyboard() {
-      const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
-      els.keyboard.innerHTML = "";
-      letters.forEach(letter => {
-        const b = document.createElement("button");
-        b.className = "key";
-        b.type = "button";
-        b.textContent = letter;
-        b.dataset.letter = letter;
-        b.setAttribute("aria-label", `Guess ${letter}`);
-        b.addEventListener("click", () => guess(letter));
-        els.keyboard.appendChild(b);
-      });
-    }
-
-    function guess(raw) {
-      const letter = raw.toUpperCase();
-      if (!/^[A-Z]$/.test(letter)) return;
-
-      if (state.guessed.has(letter)) {
-        els.message.textContent = "Already tried that.";
-        return;
-      }
+    function guess(raw){
+      const letter=raw.toUpperCase();
+      if(!/^[A-Z]$/.test(letter)) return;
+      if(state.guessed.has(letter)){ els.message.textContent="Already tried that."; return; }
       state.guessed.add(letter);
-
-      if (state.word.includes(letter)) {
-        // reveal all occurrences
-        [...state.word].forEach((ch, i) => {
-          if (ch === letter) state.revealed[i] = true;
-        });
-        els.message.textContent = "Good pick.";
-      } else {
-        state.wrong += 1;
-        els.message.textContent = "Nope.";
-      }
-
-      renderWord();
-      renderStatus();
-      checkEnd();
+      if(state.word.includes(letter)){
+        [...state.word].forEach((ch,i)=>{ if(ch===letter) state.revealed[i]=true; });
+        els.message.textContent="Good pick.";
+      } else { state.wrong+=1; els.message.textContent="Nope."; }
+      renderWord(); renderStatus(); checkEnd();
     }
-
-    function checkEnd() {
-      const won = state.revealed.every(v => v === true);
-      const lost = state.wrong >= state.maxWrong;
-
-      if (won) {
-        openModal("You win 🎉", `Word: ${state.word}`);
-        disableAllKeys();
-        els.hint.disabled = true;
-      } else if (lost) {
-        // Draw final flourish
-        resetCanvas();
-        drawParts(7);
-        openModal("You lose 💀", `Word was: ${state.word}`);
-        disableAllKeys();
-        els.hint.disabled = true;
-      }
+    function useHint(){
+      if(state.hintUsed) return;
+      const options=[]; [...state.word].forEach((ch,i)=>{ if(/[A-Z]/.test(ch) && !state.revealed[i]) options.push(ch); });
+      if(!options.length) return;
+      const reveal=options[Math.floor(Math.random()*options.length)];
+      state.hintUsed=true; els.hint.disabled=true;
+      state.wrong=Math.min(state.wrong+1, state.maxWrong);
+      if(!state.guessed.has(reveal)) state.guessed.add(reveal);
+      [...state.word].forEach((ch,i)=>{ if(ch===reveal) state.revealed[i]=true; });
+      els.message.textContent=`Hint used: ${reveal}`;
+      renderWord(); renderStatus(); checkEnd();
     }
-
-    function disableAllKeys() {
-      [...els.keyboard.querySelectorAll("button.key")].forEach(b => b.disabled = true);
+    function openModal(title,text){ els.modalTitle.textContent=title; els.modalText.textContent=text; if(!els.modal.open) els.modal.showModal(); }
+    function closeModal(){ if(els.modal.open) els.modal.close(); }
+    function checkEnd(){
+      const won = state.revealed.every(v=>v===true);
+      const lost = state.wrong>=state.maxWrong;
+      if(won){ openModal("You win 🎉",`Word: ${state.word}`); els.hint.disabled=true; disableKeys(); }
+      else if(lost){ resetCanvas(); drawParts(7); openModal("You lose 💀",`Word was: ${state.word}`); els.hint.disabled=true; disableKeys(); }
     }
-
-    function useHint() {
-      if (state.hintUsed) return;
-      // Find unrevealed letters in the word
-      const options = [];
-      [...state.word].forEach((ch, i) => {
-        if (/[A-Z]/.test(ch) && !state.revealed[i]) options.push(ch);
-      });
-      if (!options.length) return;
-      const reveal = options[Math.floor(Math.random() * options.length)];
-      state.hintUsed = true;
-      els.hint.disabled = true;
-      // Hints cost 1 mistake to keep it fair
-      state.wrong = Math.min(state.wrong + 1, state.maxWrong);
-      // Auto-guess the revealed letter so UI stays consistent
-      if (!state.guessed.has(reveal)) state.guessed.add(reveal);
-      [...state.word].forEach((ch, i) => {
-        if (ch === reveal) state.revealed[i] = true;
-      });
-      els.message.textContent = `Hint used: ${reveal}`;
-      renderWord();
-      renderStatus();
-      checkEnd();
-    }
-
-    function openModal(title, text) {
-      els.modalTitle.textContent = title;
-      els.modalText.textContent = text;
-      if (!els.modal.open) els.modal.showModal();
-    }
-
-    function closeModal() {
-      if (els.modal.open) els.modal.close();
-    }
+    function disableKeys(){ document.querySelectorAll("button.key").forEach(b=> b.disabled=true); }
 
     // Events
-    els.newGame.addEventListener("click", startNewGame);
-    els.hint.addEventListener("click", useHint);
-    els.difficulty.addEventListener("change", () => startNewGame());
-    els.playAgain.addEventListener("click", () => {
-      closeModal();
-      startNewGame();
-    });
+    document.getElementById("newGame").addEventListener("click", startNewGame);
+    document.getElementById("hintBtn").addEventListener("click", useHint);
+    document.getElementById("difficulty").addEventListener("change", ()=> startNewGame());
+    document.getElementById("playAgain").addEventListener("click", ()=>{ closeModal(); startNewGame(); });
 
     // Physical keyboard input
-    window.addEventListener("keydown", (e) => {
-      // If modal is open, Enter restarts
-      if (els.modal.open && (e.key === "Enter" || e.key === " ")) {
-        e.preventDefault();
-        els.playAgain.click();
-        return;
-      }
-      const k = e.key.toUpperCase();
-      if (/^[A-Z]$/.test(k)) {
-        e.preventDefault();
-        guess(k);
-      }
+    window.addEventListener("keydown", e=>{
+      if(els.modal.open && (e.key==="Enter" || e.key===" ")){ e.preventDefault(); document.getElementById("playAgain").click(); return; }
+      const k=e.key.toUpperCase();
+      if(/^[A-Z]$/.test(k)){ e.preventDefault(); guess(k); }
     });
 
     // Init
+    buildKeyboard();
     startNewGame();
   </script>
-<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-<script>
-  // === Supabase keys (Settings → API)
-  const SUPABASE_URL = "https://ziifznktzzpvtdkrycvt.supabase.co";   // paste
-  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InppaWZ6bmt0enpwdnRka3J5Y3Z0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ5MjM5NTgsImV4cCI6MjA3MDQ5OTk1OH0.DsIXaOj5J4kTWep7zIyw2ulbCJSXMOD9rZVP_vCqb5M";                      // paste
-  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-  // === Name + avatar handling ===
-  const nameDlg = document.getElementById("nameModal");
-  const nameInput = document.getElementById("nameInput");
-  const nameAvatar = document.getElementById("nameAvatar");
-  const saveNameBtn = document.getElementById("saveName");
+  <!-- Leaderboard + username + avatars -->
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <script>
+    /* ===========================
+       1) FILL THESE TWO VALUES
+       =========================== */
+    const SUPABASE_URL = "https://ziifznktzzpvtdkrycvt.supabase.co";  // <-- replace
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InppaWZ6bmt0enpwdnRka3J5Y3Z0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ5MjM5NTgsImV4cCI6MjA3MDQ5OTk1OH0.DsIXaOj5J4kTWep7zIyw2ulbCJSXMOD9rZVP_vCqb5M";             // <-- replace
 
-  function seededRand(seed){ // tiny deterministic RNG from string
-    let h = 2166136261 >>> 0;
-    for (let i=0;i<seed.length;i++) { h ^= seed.charCodeAt(i); h = Math.imul(h, 16777619); }
-    return () => ((h = Math.imul(h ^ (h>>>15), 2246822507), h = Math.imul(h ^ (h>>>13), 3266489909), (h ^= h>>>16) >>> 0) / 4294967296);
-  }
+    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-  // Generate a plumber-adjacent pixel avatar (not IP) as SVG data URL
-  function makeAvatarDataURL(seedStr){
-    const rnd = seededRand(seedStr);
-    // palette vaguely Mario-ish without copying exact colors
-    const hats = ["#e33a2c","#d22f20","#c7271a","#ef493d"];
-    const shirts = ["#2261d1","#1854c3","#2b6de3","#3b7cf0"];
-    const skin = ["#f6d3b1","#f3c79d","#e9b98d"];
-    const overalls = ["#1a3c8a","#15357c","#214a9e"];
-    const hat = hats[Math.floor(rnd()*hats.length)];
-    const top = shirts[Math.floor(rnd()*shirts.length)];
-    const face = skin[Math.floor(rnd()*skin.length)];
-    const dung = overalls[Math.floor(rnd()*overalls.length)];
-    const moust = rnd() < 0.8 ? "#3b220f" : "#000";
-    // 10x10 pixel grid, each px = 4 units
-    const px = 4, N = 10, S = 40; // viewBox 40x40
-    const cells = [];
-    function rect(x,y,c){ cells.push(`<rect x="${x*px}" y="${y*px}" width="${px}" height="${px}" fill="${c}"/>`); }
-    // Build a simple sprite: hat row, face rows, shirt/overalls rows
-    for(let x=2;x<=7;x++) rect(x,1,hat);
-    for(let x=3;x<=6;x++) rect(x,2,hat);
-    // face
-    for(let y=3;y<=5;y++) for(let x=2;x<=7;x++) rect(x,y,face);
-    // eyes
-    rect(3,4,"#000"); rect(6,4,"#000");
-    // moustache line
-    if (moust) for(let x=3;x<=6;x++) rect(x,5,moust);
-    // shirt shoulders
-    for(let x=1;x<=8;x++) rect(x,6,top);
-    // overalls body
-    for(let y=7;y<=8;y++) for(let x=2;x<=7;x++) rect(x,y,dung);
-    // buttons
-    rect(3,7,"#ffd34d"); rect(6,7,"#ffd34d");
-    // shoes
-    for(let x=2;x<=7;x++) rect(x,9,"#5a3b17");
-
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${S} ${S}">${cells.join("")}</svg>`;
-    return "data:image/svg+xml;utf8," + encodeURIComponent(svg);
-  }
-
-  function ensureName(){
-    let name = localStorage.getItem("hm_name");
-    if (!name) {
-      name = "Player" + Math.floor(Math.random()*1000);
-      nameInput.value = name;
-      nameAvatar.src = makeAvatarDataURL(name);
-      nameDlg.showModal();
-    } else {
-      nameAvatar.src = makeAvatarDataURL(name);
+    // Deterministic tiny RNG from string
+    function seededRand(seed){
+      let h = 2166136261 >>> 0;
+      for (let i=0;i<seed.length;i++){ h ^= seed.charCodeAt(i); h = Math.imul(h,16777619); }
+      return ()=> ((h = Math.imul(h ^ (h>>>15),2246822507), h = Math.imul(h ^ (h>>>13),3266489909), (h ^= h>>>16) >>> 0) / 4294967296);
     }
-  }
-
-  nameInput.addEventListener("input", ()=> nameAvatar.src = makeAvatarDataURL(nameInput.value || "Player"));
-  saveNameBtn.addEventListener("click", () => {
-    const n = (nameInput.value || "Player").trim().slice(0,16);
-    localStorage.setItem("hm_name", n);
-    nameDlg.close();
-  });
-
-  // === Leaderboard logic ===
-  function computeScore({mode, mistakes, durationMs, usedHint, won}) {
-    if (!won) return 0;
-    let base = 1000;
-    base -= mistakes * 120;
-    base -= Math.floor(durationMs / 1000) * 5;
-    if (mode === "hard") base += 250;
-    if (mode === "easy") base -= 150;
-    if (usedHint) base -= 200;
-    return Math.max(0, base);
-  }
-
-  async function submitScore(payload) {
-    const { error } = await sb.from("leaderboard").insert(payload);
-    if (error) console.error(error);
-    await loadTop10();
-  }
-
-  async function loadTop10() {
-    const { data, error } = await sb
-      .from("leaderboard")
-      .select("name, mode, score, mistakes")
-      .order("score", { ascending: false })
-      .limit(10);
-    if (error) { console.error(error); return; }
-    const ol = document.getElementById("top10");
-    const esc = s => (s||"").toString().replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-    ol.innerHTML = (data||[]).map((r,i)=>{
-      const src = makeAvatarDataURL(r.name);
-      return `<li><img class="avatar" src="${src}" alt=""><strong>${i+1}.</strong> ${esc(r.name)} — <strong>${r.score}</strong> <span class="muted">(${r.mode}, ${r.mistakes} miss)</span></li>`;
-    }).join("");
-  }
-
-  // Patch into your existing lifecycle
-  let roundStart = performance.now();
-  const __start = window.startNewGame;
-  window.startNewGame = function(){ __start(); roundStart = performance.now(); ensureName(); loadTop10(); };
-  const __check = window.checkEnd;
-  window.checkEnd = function(){
-    __check();
-    const won = state.revealed.every(v => v === true);
-    const lost = state.wrong >= state.maxWrong;
-    if (won || lost) {
-      const durationMs = Math.max(0, performance.now() - roundStart);
-      const score = computeScore({ mode: state.difficulty, mistakes: state.wrong, durationMs, usedHint: state.hintUsed, won });
-      if (won) submitScore({
-        name: localStorage.getItem("hm_name") || "Anon",
-        mode: state.difficulty,
-        mistakes: state.wrong,
-        duration_ms: Math.floor(durationMs),
-        used_hint: state.hintUsed,
-        score
-      });
+    // Plumber-adjacent pixel avatar (SVG) as data URL
+    function makeAvatarDataURL(seedStr){
+      const rnd = seededRand(seedStr||"Player");
+      const hats = ["#e33a2c","#d22f20","#c7271a","#ef493d"];
+      const shirts = ["#2261d1","#1854c3","#2b6de3","#3b7cf0"];
+      const skin = ["#f6d3b1","#f3c79d","#e9b98d"];
+      const overalls = ["#1a3c8a","#15357c","#214a9e"];
+      const hat = hats[(rnd()*hats.length)|0], top = shirts[(rnd()*shirts.length)|0];
+      const face = skin[(rnd()*skin.length)|0], dung = overalls[(rnd()*overalls.length)|0];
+      const moust = rnd()<0.8 ? "#3b220f" : "#000";
+      const px=4, S=40; const cells=[];
+      const rect=(x,y,c)=>cells.push(`<rect x="${x*px}" y="${y*px}" width="${px}" height="${px}" fill="${c}"/>`);
+      for(let x=2;x<=7;x++) rect(x,1,hat); for(let x=3;x<=6;x++) rect(x,2,hat);
+      for(let y=3;y<=5;y++) for(let x=2;x<=7;x++) rect(x,y,face);
+      rect(3,4,"#000"); rect(6,4,"#000");
+      for(let x=3;x<=6;x++) rect(x,5,moust);
+      for(let x=1;x<=8;x++) rect(x,6,top);
+      for(let y=7;y<=8;y++) for(let x=2;x<=7;x++) rect(x,y,dung);
+      rect(3,7,"#ffd34d"); rect(6,7,"#ffd34d");
+      for(let x=2;x<=7;x++) rect(x,9,"#5a3b17");
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${S} ${S}">${cells.join("")}</svg>`;
+      return "data:image/svg+xml;utf8,"+encodeURIComponent(svg);
     }
-  };
 
-  // Kick off
-  ensureName();
-  loadTop10();
-</script>
+    // Name flow
+    const nameDlg = document.getElementById("nameModal");
+    const nameInput = document.getElementById("nameInput");
+    const nameAvatar = document.getElementById("nameAvatar");
+    const saveNameBtn = document.getElementById("saveName");
+
+    function ensureName(){
+      let name = localStorage.getItem("hm_name");
+      if(!name){
+        name = "Player"+Math.floor(Math.random()*1000);
+        nameInput.value = name;
+        nameAvatar.src = makeAvatarDataURL(name);
+        nameDlg.showModal();
+      } else {
+        nameAvatar.src = makeAvatarDataURL(name);
+      }
+    }
+    nameInput.addEventListener("input", ()=> nameAvatar.src = makeAvatarDataURL(nameInput.value || "Player"));
+    saveNameBtn.addEventListener("click", ()=>{
+      const n = (nameInput.value || "Player").trim().slice(0,16);
+      localStorage.setItem("hm_name", n);
+      nameDlg.close();
+      loadTop10();
+    });
+
+    // Scoring + Leaderboard
+    function computeScore({mode, mistakes, durationMs, usedHint, won}){
+      if(!won) return 0;
+      let base=1000;
+      base -= mistakes*120;
+      base -= Math.floor(durationMs/1000)*5;
+      if(mode==="hard") base += 250;
+      if(mode==="easy") base -= 150;
+      if(usedHint) base -= 200;
+      return Math.max(0, base);
+    }
+    async function submitScore(payload){
+      const { error } = await sb.from("leaderboard").insert(payload);
+      if(error) console.error(error);
+      await loadTop10();
+    }
+    async function loadTop10(){
+      const { data, error } = await sb
+        .from("leaderboard")
+        .select("name, mode, score, mistakes")
+        .order("score",{ascending:false})
+        .limit(10);
+      if(error){ console.error(error); return; }
+      const esc = s => (s||"").toString().replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+      document.getElementById("top10").innerHTML = (data||[]).map((r,i)=>{
+        const src = makeAvatarDataURL(r.name);
+        return `<li><img class="avatar" src="${src}" alt=""><strong>${i+1}.</strong> ${esc(r.name)} — <strong>${r.score}</strong> <span class="muted">(${r.mode}, ${r.mistakes} miss)</span></li>`;
+      }).join("");
+    }
+
+    // Patch into game lifecycle
+    let roundStart = performance.now();
+    const __start = startNewGame;
+    startNewGame = function(){ __start(); roundStart=performance.now(); ensureName(); loadTop10(); };
+    const __check = checkEnd;
+    checkEnd = function(){
+      __check();
+      const won = state.revealed.every(v=>v===true);
+      const lost = state.wrong>=state.maxWrong;
+      if(won || lost){
+        const durationMs = Math.max(0, performance.now()-roundStart);
+        const score = computeScore({ mode:state.difficulty, mistakes:state.wrong, durationMs, usedHint:state.hintUsed, won });
+        if(won){
+          submitScore({
+            name: localStorage.getItem("hm_name") || "Anon",
+            mode: state.difficulty,
+            mistakes: state.wrong,
+            duration_ms: Math.floor(durationMs),
+            used_hint: state.hintUsed,
+            score
+          });
+        }
+      }
+    };
+
+    // Kick off on first load
+    ensureName();
+    loadTop10();
+  </script>
 </body>
 </html>
